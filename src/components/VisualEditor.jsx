@@ -22,6 +22,7 @@ import './VisualEditor.css';
 
 import { TextStyle } from '@tiptap/extension-text-style';
 import { Extension } from '@tiptap/core';
+import { supabase } from '../lib/supabase';
 
 // カスタム行間拡張機能
 const LineHeight = Extension.create({
@@ -61,6 +62,10 @@ const LineHeight = Extension.create({
 });
 
 const VisualEditor = ({ content, onChange }) => {
+  const [images, setImages] = React.useState([]);
+  const [showImagePicker, setShowImagePicker] = React.useState(false);
+  const [uploading, setUploading] = React.useState(false);
+
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -90,17 +95,49 @@ const VisualEditor = ({ content, onChange }) => {
     },
   });
 
-  const [images, setImages] = React.useState([]);
-  const [showImagePicker, setShowImagePicker] = React.useState(false);
+  const fetchImages = async () => {
+    try {
+      const { data, error } = await supabase.storage.from('wiki-images').list('', { limit: 100, sortBy: { column: 'name', order: 'desc' } });
+      if (error) throw error;
+      if (data) {
+        const urls = data.map(fileobj => {
+          const { data: { publicUrl } } = supabase.storage.from('wiki-images').getPublicUrl(fileobj.name);
+          return publicUrl;
+        });
+        setImages(urls);
+      }
+    } catch (err) { console.error("Error fetching images:", err); }
+  };
 
   React.useEffect(() => {
     if (showImagePicker) {
-      fetch('/api/images')
-        .then(res => res.json())
-        .then(data => setImages(data))
-        .catch(err => console.error(err));
+      fetchImages();
     }
   }, [showImagePicker]);
+
+  const handleUpload = async (event) => {
+    try {
+      setUploading(true);
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Math.random().toString(36).substring(2)}-${Date.now()}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      const { error: uploadError } = await supabase.storage.from('wiki-images').upload(filePath, file);
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage.from('wiki-images').getPublicUrl(filePath);
+      editor.chain().focus().setImage({ src: publicUrl }).run();
+      setShowImagePicker(false);
+    } catch (error) {
+      alert('アップロードに失敗しました: ' + error.message);
+    } finally {
+      setUploading(false);
+      fetchImages();
+    }
+  };
 
   const setLink = () => {
     const previousUrl = editor.getAttributes('link').href;
@@ -142,23 +179,33 @@ const VisualEditor = ({ content, onChange }) => {
             </div>
             <div className="image-picker-content">
               <div className="image-picker-section">
-                <h4>URLで指定</h4>
+                <h4>画像をアップロード</h4>
                 <div className="url-input-group">
-                  <button className="action-btn" onClick={addImageFromUrl}>URLを入力する</button>
+                  <input
+                    type="file"
+                    id="image-upload"
+                    hidden
+                    accept="image/*"
+                    onChange={handleUpload}
+                    disabled={uploading}
+                  />
+                  <label htmlFor="image-upload" className={`action-btn ${uploading ? 'uploading' : ''}`} style={{cursor: 'pointer'}}>
+                    {uploading ? 'アップロード中...' : 'ファイルを選択してアップロード'}
+                  </label>
+                  <button className="action-btn secondary" onClick={addImageFromUrl}>URLで指定</button>
                 </div>
               </div>
               
               <div className="image-picker-section">
-                <h4>サーバー内画像 (/public/images/)</h4>
+                <h4>ストレージ内の画像 (Supabase Storage)</h4>
                 {images.length === 0 ? (
-                  <p className="no-images">画像が見つかりません。public/images フォルダに配置してください。</p>
+                  <p className="no-images">画像がまだありません。上のボタンからアップロードしてください。</p>
                 ) : (
                   <div className="image-grid">
                     {images.map(url => (
                       <div key={url} className="image-item" onClick={() => selectImage(url)}>
                         <img src={url} alt="" />
-                        <span className="image-label">{url.split('/').pop()}</span>
-                        <span className="image-path">{url.substring(0, url.lastIndexOf('/'))}</span>
+                        <span className="image-label">{url.split('/').pop().split('?')[0]}</span>
                       </div>
                     ))}
                   </div>

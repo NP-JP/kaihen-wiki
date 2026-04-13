@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import VisualEditor from './components/VisualEditor';
 import { supabase } from './lib/supabase';
-import WIKI_DATA from './data/wiki-data.json';
+import WIKI_DATA from './data/wiki-data-template.json';
 
 // カテゴリーツリーを動的に構築する関数
 const buildCategoryTree = (wikiData) => {

@@ -86,6 +86,5 @@ const wikiApiPlugin = () => ({
 });
 
 export default defineConfig({
-  base: '/kaihen-wiki/',
   plugins: [react(), wikiApiPlugin()],
 })

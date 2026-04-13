@@ -521,13 +521,29 @@ a:hover {
   }
 }
 
-/* Wiki Meta */
-.wiki-meta {
-  font-size: 0.85rem;
-  color: var(--text-secondary);
-  margin-bottom: 2rem;
-  padding-bottom: 1rem;
   border-bottom: 1px solid var(--border-color);
+}
+
+/* Visitor Counter */
+.visitor-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%);
+  border: 1px solid var(--border-color);
+  padding: 8px 16px;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  box-shadow: var(--shadow-sm);
+  margin-bottom: 1.5rem;
+}
+
+.visitor-badge span {
+  font-weight: 700;
+  color: var(--accent-color);
+  font-size: 1.1rem;
+  font-family: 'Inter', sans-serif;
 }
 
 /* Image Styles */

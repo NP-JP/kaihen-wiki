@@ -280,13 +280,39 @@ export default function App() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const [showRestoreConfirm, setShowRestoreConfirm] = useState(false);
-  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [visitorCount, setVisitorCount] = useState(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => setIsAdmin(!!session));
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => setIsAdmin(!!session));
     return () => subscription.unsubscribe();
+  }, []);
+
+  // 訪問者カウンターの処理
+  useEffect(() => {
+    const handleVisitorCount = async () => {
+      try {
+        // カウントアップ (RPC経由)
+        await supabase.rpc('increment_visitor_count');
+        
+        // 最新のカウントを取得
+        const { data, error } = await supabase
+          .from('site_stats')
+          .select('value')
+          .eq('name', 'visitor_count')
+          .single();
+        
+        if (error) throw error;
+        if (data) setVisitorCount(data.value);
+      } catch (err) {
+        console.warn("Visitor count err:", err.message);
+        // エラー時は取得のみ試みる
+        const { data } = await supabase.from('site_stats').select('value').eq('name', 'visitor_count').single();
+        if (data) setVisitorCount(data.value);
+      }
+    };
+    handleVisitorCount();
   }, []);
 
   // ハッシュ変更の監視
@@ -822,6 +848,11 @@ export default function App() {
                   <h1>{article.title}</h1>
                   {article.is_editing_status && <span className="editing-badge animate-pulse">編集中</span>}
                 </div>
+                {currentTerm === "メインページ" && visitorCount !== null && (
+                  <div className="visitor-badge fade-in">
+                    あなたは <span>{visitorCount.toLocaleString()}</span> 番目の訪問者です
+                  </div>
+                )}
                 {currentTerm !== "メインページ" && (
                   <div className="wiki-meta">カテゴリー: <strong>{article.category}</strong></div>
                 )}

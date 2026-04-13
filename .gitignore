@@ -33,6 +33,7 @@ src/data/*.json
 src/data/*.js
 src/data/*.cjs
 !src/data/wiki-data.json.example
+!src/data/wiki-data-template.json
 
 # Supabase config (if any sensitive)
 .env

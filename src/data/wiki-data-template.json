@@ -1,0 +1,8 @@
+{
+  "メインページ": {
+    "title": "メインページ",
+    "category": "",
+    "content": "<h1>Wikiへようこそ</h1><p>これはビルド用のテンプレートデータです。実際のデータはSupabaseから取得されます。</p>",
+    "is_editing_status": false
+  }
+}

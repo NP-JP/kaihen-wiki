@@ -280,6 +280,7 @@ export default function App() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const [showRestoreConfirm, setShowRestoreConfirm] = useState(false);
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [visitorCount, setVisitorCount] = useState(null);
 

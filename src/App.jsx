@@ -196,7 +196,7 @@ function NavTree({ items, currentTerm, onNavigate, onRenameCategory, onDeleteCat
             <ul className="nav-tree-items">
               {node.items.map(term => (
                 <li key={term}>
-                  <a href="#" className={currentTerm === term ? 'active' : ''} onClick={(e) => { e.preventDefault(); onNavigate(term); }}>
+                  <a href={`#${encodeURIComponent(term)}`} className={currentTerm === term ? 'active' : ''}>
                     <FileText size={14} style={{ marginRight: '6px' }} />
                     {term}
                   </a>
@@ -217,7 +217,7 @@ function autoLinkTextToElements(text, titles, currentTitle, onNavigate) {
   if (sortedTitles.length === 0) return text;
   const titleRegex = new RegExp(`(${sortedTitles.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'g');
   const parts = text.split(titleRegex);
-  return parts.map((part, i) => sortedTitles.includes(part) ? <span key={i} className="internal-link" onClick={() => onNavigate(part)}>{part}</span> : part);
+  return parts.map((part, i) => sortedTitles.includes(part) ? <a key={i} href={`#${encodeURIComponent(part)}`} className="internal-link">{part}</a> : part);
 }
 
 function renderLinks(text, onNavigate, wikiData, titles, currentTitle) {
@@ -226,7 +226,7 @@ function renderLinks(text, onNavigate, wikiData, titles, currentTitle) {
   return parts.map((part, index) => {
     if (part.startsWith('[[') && part.endsWith(']]')) {
       const term = part.slice(2, -2);
-      return <span key={index} className="internal-link" onClick={() => onNavigate(term)} style={!wikiData[term] ? { color: '#ba0000' } : {}}>{term}</span>;
+      return <a key={index} href={`#${encodeURIComponent(term)}`} className="internal-link" style={!wikiData[term] ? { color: '#ba0000' } : {}}>{term}</a>;
     }
     if (part.startsWith('**') && part.endsWith('**')) return <strong key={index}>{part.slice(2, -2)}</strong>;
     if (part.startsWith('![') && part.includes('](')) {
@@ -260,12 +260,17 @@ const autoLink = (text, titles, currentTitle) => {
   if (!text || !titles || titles.length === 0) return text;
   const sortedTitles = [...titles].filter(t => t !== currentTitle && t.length > 0).sort((a, b) => b.length - a.length);
   const titleRegex = new RegExp(`(${sortedTitles.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'g');
-  return text.split(/(<[^>]+>)/g).map(part => part.startsWith('<') ? part : part.replace(titleRegex, '<span class="internal-link">$1</span>')).join('');
+  return text.split(/(<[^>]+>)/g).map(part => part.startsWith('<') ? part : part.replace(titleRegex, '<a href="#$1" class="internal-link">$1</a>')).join('');
 };
 
 export default function App() {
+  const getInitialTerm = () => {
+    const hash = window.location.hash.slice(1);
+    return hash ? decodeURIComponent(hash) : "メインページ";
+  };
+
   const [wikiData, setWikiData] = useState({});
-  const [currentTerm, setCurrentTerm] = useState("メインページ");
+  const [currentTerm, setCurrentTerm] = useState(getInitialTerm());
   const [searchQuery, setSearchQuery] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState("");
@@ -283,6 +288,29 @@ export default function App() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => setIsAdmin(!!session));
     return () => subscription.unsubscribe();
   }, []);
+
+  // ハッシュ変更の監視
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.slice(1);
+      if (hash) {
+        const decoded = decodeURIComponent(hash);
+        if (decoded !== currentTerm) setCurrentTerm(decoded);
+      } else {
+        if (currentTerm !== "メインページ") setCurrentTerm("メインページ");
+      }
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, [currentTerm]);
+
+  // currentTerm 変更をハッシュに反映
+  useEffect(() => {
+    const hash = window.location.hash.slice(1);
+    if (decodeURIComponent(hash) !== currentTerm) {
+      window.location.hash = encodeURIComponent(currentTerm);
+    }
+  }, [currentTerm]);
 
   const handleLogin = async (e) => {
     e.preventDefault();

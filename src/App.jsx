@@ -269,6 +269,7 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState("");
+  const [editTitle, setEditTitle] = useState("");
   const [editCategory, setEditCategory] = useState("");
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -301,7 +302,12 @@ export default function App() {
         if (error) throw error;
         if (data && data.length > 0) {
           const dict = {};
-          data.forEach(row => dict[row.title] = { title: row.title, category: row.category, content: row.content });
+          data.forEach(row => dict[row.title] = { 
+            title: row.title, 
+            category: row.category, 
+            content: row.content,
+            is_editing_status: row.is_editing_status 
+          });
           setWikiData(dict);
         } else {
           const seed = Object.entries(WIKI_DATA).map(([t, d]) => ({ title: t, category: d.category, content: d.content }));
@@ -313,7 +319,7 @@ export default function App() {
     initData();
   }, []);
 
-  const article = wikiData[currentTerm] || { title: currentTerm, content: "未作成", category: "未分類" };
+  const article = wikiData[currentTerm] || { title: currentTerm, content: "未作成", category: "未分類", is_editing_status: false };
   const categoryTree = useMemo(() => buildCategoryTree(wikiData), [wikiData]);
 
   useEffect(() => { window.scrollTo(0, 0); setIsEditing(false); }, [currentTerm]);
@@ -336,11 +342,12 @@ export default function App() {
       const { error } = await supabase.from('wiki_pages').insert({ title, category, content });
       if (error) throw error;
       setWikiData(prev => ({ ...prev, [title]: { title, category, content } }));
-      setCurrentTerm(title); setEditContent(content); setEditCategory(category); setIsEditing(true);
+      setCurrentTerm(title); setEditTitle(title); setEditContent(content); setEditCategory(category); setIsEditing(true);
     } catch (err) { alert("新規作成に失敗しました: " + err.message); }
   };
 
   const startEditing = () => {
+    setEditTitle(article.title);
     setEditContent(article.content);
     setEditCategory(article.category);
     setIsEditing(true);
@@ -357,12 +364,62 @@ export default function App() {
   };
 
   const saveEdit = async () => {
+    const finalTitle = editTitle.trim();
+    if (!finalTitle) { alert("タイトルを入力してください。"); return; }
+    
+    // タイトルが変更された場合の重複チェック
+    if (finalTitle !== currentTerm && wikiData[finalTitle]) {
+      alert("そのタイトルの記事は既に存在します。");
+      return;
+    }
+
     try {
-      const { error } = await supabase.from('wiki_pages').upsert({ title: currentTerm, category: editCategory, content: editContent }, { onConflict: 'title' });
-      if (error) throw error;
-      setWikiData(prev => ({ ...prev, [currentTerm]: { ...article, category: editCategory, content: editContent } }));
+      if (finalTitle !== currentTerm) {
+        // タイトルが変更された場合：既存レコードのタイトルを更新
+        const { error } = await supabase
+          .from('wiki_pages')
+          .update({ title: finalTitle, category: editCategory, content: editContent })
+          .eq('title', currentTerm);
+        
+        if (error) throw error;
+
+        // ステートの同期
+        setWikiData(prev => {
+          const next = { ...prev };
+          const oldData = next[currentTerm];
+          delete next[currentTerm];
+          next[finalTitle] = { ...oldData, title: finalTitle, category: editCategory, content: editContent };
+          return next;
+        });
+        setCurrentTerm(finalTitle);
+      } else {
+        // タイトルが同じ場合：upsert
+        const { error } = await supabase.from('wiki_pages').upsert({ title: currentTerm, category: editCategory, content: editContent }, { onConflict: 'title' });
+        if (error) throw error;
+        setWikiData(prev => ({ ...prev, [currentTerm]: { ...article, category: editCategory, content: editContent } }));
+      }
       setIsEditing(false);
     } catch (err) { alert("保存に失敗しました: " + err.message); }
+  };
+
+  const toggleEditingStatus = async () => {
+    if (!isAdmin) return;
+    const newStatus = !article.is_editing_status;
+    try {
+      const { error } = await supabase
+        .from('wiki_pages')
+        .update({ is_editing_status: newStatus })
+        .eq('title', currentTerm);
+      
+      if (error) throw error;
+      
+      setWikiData(prev => ({
+        ...prev,
+        [currentTerm]: { ...prev[currentTerm], is_editing_status: newStatus }
+      }));
+    } catch (err) {
+      alert("ステータスの更新に失敗しました: " + err.message);
+    }
   };
 
   const renameCategory = async (oldPath, shortName) => {
@@ -659,7 +716,16 @@ export default function App() {
           <div className="header-actions">
             {!isEditing ? (
               <div className="header-button-group">
-                {isAdmin && ( <> <button className="action-btn" onClick={createNewPage}><Book size={16} /> 新規</button> <button className="action-btn" onClick={startEditing}><Edit size={16} /> 編集</button> {currentTerm !== "メインページ" && <button className="action-btn" onClick={deleteArticle}><Trash2 size={16} /> 削除</button>} </> )}
+                {isAdmin && ( 
+                  <> 
+                    <button className={`action-btn ${article.is_editing_status ? 'status-active-btn' : ''}`} onClick={toggleEditingStatus}>
+                      <Lock size={16} /> {article.is_editing_status ? '「編集中」を解除' : '「編集中」に設定'}
+                    </button>
+                    <button className="action-btn" onClick={createNewPage}><Book size={16} /> 新規</button> 
+                    <button className="action-btn" onClick={startEditing}><Edit size={16} /> 編集</button> 
+                    {currentTerm !== "メインページ" && <button className="action-btn" onClick={deleteArticle}><Trash2 size={16} /> 削除</button>} 
+                  </> 
+                )}
               </div>
             ) : (
               <div className="edit-controls">
@@ -688,10 +754,23 @@ export default function App() {
 
         <div className="content-container">
           <article className="wiki-article">
-            <h1>{article.title}</h1>
             {isEditing ? (
-              currentTerm !== "メインページ" && (
-                <div className="edit-metadata">
+              <div className="edit-metadata">
+                <div className="metadata-field">
+                  <label>タイトル</label>
+                  <input 
+                    type="text" 
+                    value={editTitle} 
+                    onChange={(e) => setEditTitle(e.target.value)} 
+                    placeholder="タイトルを入力"
+                    disabled={currentTerm === "メインページ"}
+                    className="title-edit-input"
+                  />
+                  {currentTerm === "メインページ" && (
+                    <p style={{fontSize: '0.75rem', color: '#888', marginTop: '4px'}}>※メインページはタイトルの変更ができません。</p>
+                  )}
+                </div>
+                {currentTerm !== "メインページ" && (
                   <div className="metadata-field">
                     <label>カテゴリー</label>
                     <input 
@@ -707,10 +786,18 @@ export default function App() {
                       ))}
                     </datalist>
                   </div>
-                </div>
-              )
+                )}
+              </div>
             ) : (
-              currentTerm !== "メインページ" && <div className="wiki-meta">カテゴリー: <strong>{article.category}</strong></div>
+              <>
+                <div className="title-row">
+                  <h1>{article.title}</h1>
+                  {article.is_editing_status && <span className="editing-badge animate-pulse">編集中</span>}
+                </div>
+                {currentTerm !== "メインページ" && (
+                  <div className="wiki-meta">カテゴリー: <strong>{article.category}</strong></div>
+                )}
+              </>
             )}
             
             {isEditing ? ( <VisualEditor content={editContent} onChange={setEditContent} /> ) : (

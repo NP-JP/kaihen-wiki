@@ -477,6 +477,50 @@ a:hover {
   font-weight: 600;
 }
 
+/* Article Title and status */
+.title-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 0.5rem;
+}
+
+.title-row h1 {
+  margin: 0;
+  border-bottom: none;
+}
+
+.editing-badge {
+  background: #fff3e0;
+  color: #ef6c00;
+  border: 1px solid #ffe0b2;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.status-active-btn {
+  background: #fff3e0 !important;
+  color: #ef6c00 !important;
+  border-color: #ffe0b2 !important;
+}
+
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: .7;
+  }
+}
+
 /* Wiki Meta */
 .wiki-meta {
   font-size: 0.85rem;

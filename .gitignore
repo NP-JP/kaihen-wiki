@@ -27,3 +27,13 @@ yarn-error.log*
 # OS files
 .DS_Store
 Thumbs.db
+
+# Wiki data and private scripts
+src/data/*.json
+src/data/*.js
+src/data/*.cjs
+!src/data/wiki-data.json.example
+
+# Supabase config (if any sensitive)
+.env
+.env*.local

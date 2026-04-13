@@ -68,7 +68,10 @@ const VisualEditor = ({ content, onChange }) => {
 
   const editor = useEditor({
     extensions: [
-      StarterKit,
+      StarterKit.configure({
+        // 以下の機能が重複しないように明示的に設定（環境によってStarterKitに含まれる場合があるため）
+        history: true,
+      }),
       TextStyle,
       Underline,
       Highlight,
